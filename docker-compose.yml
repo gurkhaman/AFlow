@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  vllm-qwen:
+    image: vllm/vllm-openai:latest
+    container_name: aflow-vllm-qwen
+    runtime: nvidia
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN:-}
+      - CUDA_VISIBLE_DEVICES=0
+    ports:
+      - "8000:8000"
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    ipc: host
+    command: >
+      --model Qwen/Qwen2.5-3B-Instruct
+      --dtype auto
+      --max-model-len 8192
+      --gpu-memory-utilization 0.9
+      --trust-remote-code
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
