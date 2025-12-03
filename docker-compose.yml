@@ -1,13 +1,14 @@
 version: '3.8'
 
 services:
+  # GPU 0: Qwen 2.5 3B
   vllm-qwen:
     image: vllm/vllm-openai:latest
     container_name: aflow-vllm-qwen
     runtime: nvidia
     environment:
-      - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN:-}
       - CUDA_VISIBLE_DEVICES=0
+      - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN:-}
     ports:
       - "8000:8000"
     volumes:
@@ -24,5 +25,59 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: 1
+              device_ids: ['0']
+              capabilities: [gpu]
+
+  # GPU 1: Llama 3.2 3B
+  vllm-llama:
+    image: vllm/vllm-openai:latest
+    container_name: aflow-vllm-llama
+    runtime: nvidia
+    environment:
+      - CUDA_VISIBLE_DEVICES=1
+      - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN:-}
+    ports:
+      - "8001:8000"
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    ipc: host
+    command: >
+      --model meta-llama/Llama-3.2-3B-Instruct
+      --dtype auto
+      --max-model-len 8192
+      --gpu-memory-utilization 0.9
+      --trust-remote-code
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['1']
+              capabilities: [gpu]
+
+  # GPU 2: Phi-3 mini
+  vllm-phi3:
+    image: vllm/vllm-openai:latest
+    container_name: aflow-vllm-phi3
+    runtime: nvidia
+    environment:
+      - CUDA_VISIBLE_DEVICES=2
+      - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN:-}
+    ports:
+      - "8002:8000"
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    ipc: host
+    command: >
+      --model microsoft/Phi-3-mini-4k-instruct
+      --dtype auto
+      --max-model-len 4096
+      --gpu-memory-utilization 0.9
+      --trust-remote-code
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['2']
               capabilities: [gpu]
