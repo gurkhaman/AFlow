@@ -7,7 +7,6 @@ services:
     container_name: aflow-vllm-qwen
     runtime: nvidia
     environment:
-      - CUDA_VISIBLE_DEVICES=0
       - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN:-}
     ports:
       - "8000:8000"
@@ -34,7 +33,6 @@ services:
     container_name: aflow-vllm-llama
     runtime: nvidia
     environment:
-      - CUDA_VISIBLE_DEVICES=1
       - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN:-}
     ports:
       - "8001:8000"
@@ -61,7 +59,6 @@ services:
     container_name: aflow-vllm-phi3
     runtime: nvidia
     environment:
-      - CUDA_VISIBLE_DEVICES=2
       - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN:-}
     ports:
       - "8002:8000"
