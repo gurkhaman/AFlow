@@ -68,6 +68,9 @@ class Optimizer:
         self.evaluation_utils = EvaluationUtils(self.root_path)
         self.convergence_utils = ConvergenceUtils(self.root_path)
 
+        # Optional MLflow callback
+        self.mlflow_callback = None
+
     def optimize(self, mode: OptimizerType = "Graph"):
         if mode == "Test":
             test_n = 1  # validation datasets's execution number
@@ -104,6 +107,10 @@ class Optimizer:
 
             self.round += 1
             logger.info(f"Score for round {self.round}: {score}")
+
+            # Log to MLflow if callback is set
+            if self.mlflow_callback and score is not None:
+                self.mlflow_callback.log_metric("round_score", score, step=self.round)
 
             converged, convergence_round, final_round = self.convergence_utils.check_convergence(top_k=3)
 

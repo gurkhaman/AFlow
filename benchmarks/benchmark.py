@@ -77,14 +77,18 @@ class BaseBenchmark(ABC):
         pass
 
     @abstractmethod
-    def calculate_score(self, expected_output: Any, prediction: Any) -> Tuple[float, Any]:
+    def calculate_score(
+        self, expected_output: Any, prediction: Any
+    ) -> Tuple[float, Any]:
         pass
 
     @abstractmethod
     def get_result_columns(self) -> List[str]:
         pass
 
-    async def evaluate_all_problems(self, data: List[dict], agent: Callable, max_concurrent_tasks: int = 50):
+    async def evaluate_all_problems(
+        self, data: List[dict], agent: Callable, max_concurrent_tasks: int = 20
+    ):
         semaphore = asyncio.Semaphore(max_concurrent_tasks)
 
         async def sem_evaluate(problem):
@@ -92,25 +96,31 @@ class BaseBenchmark(ABC):
                 return await self.evaluate_problem(problem, agent)
 
         tasks = [sem_evaluate(problem) for problem in data]
-        return await tqdm_asyncio.gather(*tasks, desc=f"Evaluating {self.name} problems", total=len(data))
+        return await tqdm_asyncio.gather(
+            *tasks, desc=f"Evaluating {self.name} problems", total=len(data)
+        )
 
-    async def run_evaluation(self, agent: Callable, va_list: List[int], max_concurrent_tasks: int = 50):
+    async def run_evaluation(
+        self, agent: Callable, va_list: List[int], max_concurrent_tasks: int = 20
+    ):
         data = await self.load_data(va_list)
         results = await self.evaluate_all_problems(data, agent, max_concurrent_tasks)
         columns = self.get_result_columns()
-        average_score, average_cost, total_cost = self.save_results_to_csv(results, columns)
+        average_score, average_cost, total_cost = self.save_results_to_csv(
+            results, columns
+        )
         logger.info(f"Average score on {self.name} dataset: {average_score:.5f}")
         logger.info(f"Total Cost: {total_cost:.5f}")
         return average_score, average_cost, total_cost
-    
 
-    async def run_baseline(self, agent: Callable, max_concurrent_tasks: int = 50):
+    async def run_baseline(self, agent: Callable, max_concurrent_tasks: int = 20):
         data = await self.load_data()
         results = await self.evaluate_all_problems(data, agent, max_concurrent_tasks)
         columns = self.get_result_columns()
-        average_score, average_cost, total_cost = self.save_results_to_csv(results, columns)
+        average_score, average_cost, total_cost = self.save_results_to_csv(
+            results, columns
+        )
         logger.info(f"Average score on {self.name} dataset: {average_score:.5f}")
         logger.info(f"Total Cost: {total_cost:.5f}")
         logger.info(f"Avg Cost:{average_cost:.5f}")
         return average_score, average_cost, total_cost
-

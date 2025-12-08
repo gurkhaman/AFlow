@@ -113,7 +113,24 @@ class GraphUtils:
         return None
 
     def write_graph_files(self, directory: str, response: dict, round_number: int, dataset: str):
-        graph = WORKFLOW_TEMPLATE.format(graph=response["graph"], round=round_number, dataset=dataset)
+        # Convert root_path to Python module path for imports
+        # e.g., "experiments/runs/Qwen_Qwen2_5_3B_Instruct/qwen_trial1_20251205/GSM8K"
+        #    -> "experiments.runs.Qwen_Qwen2_5_3B_Instruct.qwen_trial1_20251205.GSM8K"
+        workspace_module_path = self.root_path.replace("/", ".").replace("\\", ".")
+
+        # Create custom template with dynamic workspace path
+        dynamic_template = f"""from typing import Literal
+import {workspace_module_path}.workflows.template.operator as operator
+import {workspace_module_path}.workflows.round_{round_number}.prompt as prompt_custom
+from scripts.async_llm import create_llm_instance
+
+
+from scripts.evaluator import DatasetType
+
+{{graph}}
+"""
+
+        graph = dynamic_template.format(graph=response["graph"])
 
         with open(os.path.join(directory, "graph.py"), "w", encoding="utf-8") as file:
             file.write(graph)

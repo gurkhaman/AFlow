@@ -6,4 +6,6 @@ optimized
 */__pycache__
 *.pyc
 /workspace
+/experiments/runs
 *.json
+/mlruns
