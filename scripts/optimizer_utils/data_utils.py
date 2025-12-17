@@ -120,9 +120,12 @@ class DataUtils:
     def get_results_file_path(self, graph_path: str) -> str:
         return os.path.join(graph_path, "results.json")
 
-    def create_result_data(self, round: int, score: float, avg_cost: float, total_cost: float) -> dict:
+    def create_result_data(self, round: int, score: float, avg_cost: float, total_cost: float, is_test: bool = False) -> dict:
         now = datetime.datetime.now()
-        return {"round": round, "score": score, "avg_cost": avg_cost, "total_cost": total_cost, "time": now}
+        result = {"round": round, "score": score, "avg_cost": avg_cost, "total_cost": total_cost, "time": now}
+        if is_test:
+            result["is_test"] = True
+        return result
 
     def save_results(self, json_file_path: str, data: list):
         write_json_file(json_file_path, data, encoding="utf-8", indent=4)
@@ -147,3 +150,39 @@ class DataUtils:
         self.top_scores.sort(key=lambda x: x["score"], reverse=True)
 
         return self.top_scores
+
+    def get_best_validation_round(self, path=None):
+        """
+        Get the round with the highest average validation score (excluding test results).
+
+        Returns:
+            dict: {"round": int, "score": float} for best performing round
+        """
+        self._load_scores(path, mode="Graph")
+
+        # Filter out test results (which would have is_test=True)
+        # Note: _load_scores already computes mean per round, so self.top_scores
+        # contains {"round": N, "score": avg_score} entries
+        # We need to check the original data to filter out test entries
+        if path is None or path == "Graph":
+            rounds_dir = os.path.join(self.root_path, "workflows")
+        else:
+            rounds_dir = path
+
+        result_file = os.path.join(rounds_dir, "results.json")
+        data = read_json_file(result_file, encoding="utf-8")
+
+        # Filter out test results
+        validation_data = [r for r in data if not r.get("is_test", False)]
+
+        if not validation_data:
+            raise ValueError("No validation scores found in results.json")
+
+        # Compute mean score per round for validation data only
+        df = pd.DataFrame(validation_data)
+        scores_per_round = df.groupby("round")["score"].mean().to_dict()
+
+        # Find the round with highest average score
+        best_round = max(scores_per_round.items(), key=lambda x: x[1])
+
+        return {"round": best_round[0], "score": best_round[1]}

@@ -124,6 +124,17 @@ class Optimizer:
 
             time.sleep(5)
 
+        # Automatic test evaluation after optimization completes
+        logger.info("\nOptimization complete. Starting automatic test evaluation...")
+        test_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(test_loop)
+        try:
+            test_loop.run_until_complete(self._run_test_evaluation())
+        except Exception as e:
+            logger.error(f"Automatic test evaluation failed: {e}")
+        finally:
+            test_loop.close()
+
     async def _optimize_graph(self):
         validation_n = self.validation_rounds  # validation datasets's execution number
         graph_path = f"{self.root_path}/workflows"
@@ -261,3 +272,20 @@ class Optimizer:
             data.append(new_data)
 
             self.data_utils.save_results(json_file_path, data)
+
+    async def _run_test_evaluation(self):
+        """Run test evaluation on the best validation round."""
+        from scripts.optimizer_utils.evaluation_utils import run_test_on_best_round
+
+        try:
+            await run_test_on_best_round(
+                dataset=self.dataset,
+                root_path=self.root_path,
+                exec_llm_config=self.execute_llm_config,
+                mlflow_callback=self.mlflow_callback,
+                test_runs=1
+            )
+        except Exception as e:
+            logger.error(f"Test evaluation failed: {e}")
+            import traceback
+            logger.error(traceback.format_exc())

@@ -49,6 +49,178 @@ python run.py --dataset MATH --sample 4 --max_rounds 20 --optimized_path workspa
 To test an existing workflow instead of optimizing:
 - Edit `run.py` and change `optimizer.optimize("Graph")` to `optimizer.optimize("Test")`
 
+## Running Experiments with the Experiment Runner
+
+The `experiments/` directory provides an organized system for running and tracking multiple optimization experiments with MLflow integration.
+
+### Directory Structure
+
+```
+experiments/
+├── runs/                                    # All experiment results (gitignored)
+│   └── {model_name_safe}/                  # e.g., Qwen_Qwen2_5_3B_Instruct
+│       └── {experiment_id}_{timestamp}/    # e.g., qwen_trial1_20251205_142530
+│           └── {dataset}/                  # e.g., GSM8K
+│               └── workflows/
+│                   ├── template/           # Operator definitions
+│                   ├── round_N/            # Each optimization round
+│                   ├── processed_experience.json  # MCTS tree
+│                   └── results.json        # All round scores
+├── experiment_config.yaml                  # Main experiment configuration
+├── run_experiments.py                      # CLI runner
+└── run_with_mlflow.py                      # MLflow integration wrapper
+```
+
+### Configuring Experiments
+
+Edit `experiments/experiment_config.yaml`:
+- `id`: Unique experiment identifier
+- `exec_model`: SLM that executes workflows (e.g., "Qwen/Qwen2.5-3B-Instruct")
+- `opt_model`: LLM that optimizes workflows (default: "anthropic/claude-3.5-sonnet")
+- `max_rounds`: Number of MCTS iterations (default: 20)
+- `tags`: For filtering experiments (e.g., ["phase1", "qwen"])
+
+### Running Experiments
+
+```bash
+# Single experiment
+python experiments/run_experiments.py --experiment-id qwen_trial1
+
+# All experiments with a tag
+python experiments/run_experiments.py --tag phase1
+
+# All experiments in config
+python experiments/run_experiments.py
+
+# Parallel execution: Open 3 terminals and run different experiment IDs
+```
+
+Each run creates an isolated workspace with unique timestamp, preventing conflicts.
+
+## Experiment Results & Analysis
+
+### Result Files
+
+Results are stored in: `experiments/runs/{model}/{experiment_id}_{timestamp}/{dataset}/workflows/`
+
+**Per Round (`round_N/`):**
+- `graph.py`: Generated workflow code
+- `prompt.py`: Custom prompts used in workflow
+- `{score}_{timestamp}.csv`: Detailed results for each validation problem
+- `log.json`: Execution traces and LLM responses
+
+**Overall:**
+- `results.json`: Summary of all round scores (mean, std)
+- `processed_experience.json`: Complete MCTS tree with all modifications
+
+### MLflow Tracking
+
+Start MLflow UI: `mlflow ui` → http://localhost:5000
+
+**Tracked data:**
+- Parameters: models, rounds, sample size
+- Metrics: `round_score` per optimization round
+- Artifacts: Complete workflows directory
+
+**Organization:**
+- Experiment name: `aflow_{dataset}` (e.g., `aflow_gsm8k`)
+- Run name: `{experiment_id}_{timestamp}`
+
+### Analysis
+
+**Key metrics:**
+- Best score across rounds (from `results.json`)
+- Round where best score achieved (convergence speed)
+- Total cost (sum of `cost` column in CSV files)
+- Skip rate (problems exceeding context length)
+
+**Comparing models:**
+1. Check final scores in MLflow UI or `results.json`
+2. Compare convergence speed (rounds to best score)
+3. Analyze cost per problem from CSV files
+4. Review `log.json` for error patterns
+
+### Test Set Evaluation
+
+After optimization completes, **automatic test evaluation** runs on the best validation workflow:
+
+**Process:**
+1. Identifies validation round with highest average score
+2. Runs that workflow 1 time on test set (~4x larger than validation)
+3. Saves results in same directory as validation
+
+**File Structure:**
+```
+workflows/round_N/
+├── {score}_{timestamp}.csv          # Validation results (multiple files)
+├── test_{score}_{timestamp}.csv     # Test results (1 file)
+└── log.json                          # Combined logs
+```
+
+**results.json entries:**
+```json
+{"round": 15, "score": 0.85, "is_test": true, ...}  # Test run
+{"round": 15, "score": 0.83, ...}                   # Validation run
+```
+
+**MLflow Metrics:**
+- `round_score`: Validation scores per optimization round
+- `test_score`: Test run score (single execution, step 1)
+- `test_score_avg`: Test score (same as test_score for single run)
+- `test_cost_total`: Total test evaluation cost
+
+**Analysis Example:**
+```python
+import json
+with open("results.json") as f:
+    results = json.load(f)
+
+# Separate test from validation
+validation = [r for r in results if not r.get("is_test", False)]
+test = [r for r in results if r.get("is_test", False)]
+
+# Get test performance
+test_scores = [r["score"] for r in test]
+avg_test = sum(test_scores) / len(test_scores)
+print(f"Test score: {avg_test:.5f}")
+
+# Compare validation vs test for best round
+best_val_round = max(validation, key=lambda r: r["score"])["round"]
+test_for_best = [r for r in test if r["round"] == best_val_round]
+if test_for_best:
+    test_avg = sum(r["score"] for r in test_for_best) / len(test_for_best)
+    print(f"Round {best_val_round}: validation={best_val_round['score']:.5f}, test={test_avg:.5f}")
+```
+
+## Understanding Generated Workflows
+
+### Workflow Files
+
+Each `round_N/` directory contains:
+- `graph.py`: Workflow class with `__call__()` method defining execution logic
+- `prompt.py`: Module-level variables for custom prompts (e.g., `SOLVE_PROMPT`)
+
+**Import structure:**
+- Paths are based on experiment location: `experiments.runs.{model}.{experiment_id}_{timestamp}.{dataset}.workflows.*`
+- Model names sanitized: `/` → `_`, `.` → `_`, `-` → `_`
+- Example: `Qwen/Qwen2.5-3B` → `Qwen_Qwen2_5_3B_Instruct`
+
+### Common Patterns
+
+Successful workflows often evolve toward:
+- **Self-consistency**: Generate multiple solutions, vote on answer
+- **Code generation**: Use Programmer operator for math problems
+- **Conditional logic**: Different strategies for different problem types
+- **Format enforcement**: Explicit answer format instructions
+
+### Debugging
+
+If a round performs poorly:
+1. Check `log.json` for parsing errors or LLM response issues
+2. Verify `prompt.py` defines all prompts referenced in `graph.py`
+3. Review CSV to identify which problems failed
+4. Look for syntax errors or incorrect imports in `graph.py`
+
 ## Architecture
 
 ### Core Concepts
@@ -291,6 +463,78 @@ Different domains benefit from different operator combinations:
 - **Cost-effectiveness**: Can make weaker models outperform GPT-4o at 4.55% of the inference cost
 - **Reproducibility**: Paper results available at Google Drive link (see `data/download_data.py`)
 
+## Analyzing Experimental Results
+
+### Quick Start: 4-Phase Analysis Process
+
+**Phase 1: Exploration** (Use Task tool with Explore agent)
+- Map experiments/runs/ structure: what models, datasets, trials?
+- Sample high/low performing rounds: examine graph.py and prompt.py
+- Check operator execution: read log.json for actual outputs vs expected
+
+**Phase 2: Data Collection**
+Create `experiments/analyze_experiments.py`:
+- Scan all experiments → extract metadata (model, dataset, round, score)
+- Parse workflow files → operators used, complexity, prompt features
+- Output: `analysis_data_consolidated.csv`
+
+**Phase 3: Analysis**
+Create `experiments/detailed_analysis.py`:
+- Baseline vs optimized (Round 1 vs best)
+- Operator impact (with vs without each operator)
+- Complexity analysis (simple vs complex workflows)
+- Dataset comparison (identify capability gaps)
+- Failure mode categorization (score=0 patterns)
+
+**Phase 4: Reporting**
+- Technical report: comprehensive findings with evidence
+- Discussion doc: big-picture summary for stakeholders
+
+### Key Metrics to Track
+
+**Performance:** baseline, best, average (working rounds), improvement %, failure rate
+**Operators:** usage rate, performance differential (with vs without), fake complexity rate
+**Workflows:** complexity (# calls), prompt patterns (format/verification/error prevention)
+**Datasets:** baseline difficulty, optimization headroom, capability gaps
+
+### Critical Patterns to Check
+
+**"Fake Complexity"**: Workflow calls operator but ignores output
+```python
+# In graph.py:
+result = await self.programmer(...)  # Called
+return draft["response"]  # But returned something else - programmer ignored!
+```
+
+**Model-Specific Operator Compatibility**: Operator helps some models, hurts others
+- Check differential impact: group by model, compare with/without operator
+
+**Capability Ceilings**: High baseline + low improvement = near ceiling
+- Compare baseline → optimized across datasets to identify mismatches
+
+### Example: Dec 2025 SLM Analysis
+
+**Setup:** 19 experiments, 3 models (3B), 2 datasets (GSM8K, MATH), 399 rounds
+
+**Key Finding:** Custom-only (78.2%) outperformed Custom+operators (72.6%) by 5.5%
+- Programmer: 100% fake complexity (called but ignored)
+- ScEnsemble: -64% for Qwen, +13.9% for Phi-3 (model-dependent)
+- Implication: Operators can hurt; measure differential impact per model
+
+**Analysis Scripts:**
+- `analyze_experiments.py`: Basic metrics, consolidated data
+- `detailed_analysis.py`: Research question-specific analyses
+- Output: `FULL_DATA_ANALYSIS_REPORT.md`, `MEETING_DISCUSSION_AFLOW_SLM.md`
+
+### Reusable for Future Experiments
+
+This methodology works for any combination of:
+- Models: 3B, 7B, 13B, different architectures
+- Datasets: Math, QA, Code, other domains
+- Operators: Test new operators or operator combinations
+
+Adapt metrics to task type (accuracy for QA, pass@k for code, etc.) but follow same 4-phase process.
+
 ## Common Pitfalls
 
 1. **Missing config file**: Must create `config/config2.yaml` from example before running
@@ -298,3 +542,5 @@ Different domains benefit from different operator combinations:
 3. **Operator bugs**: Some operators may have bugs from MetaGPT migration (contact maintainers if issues arise)
 4. **Validation set selection**: Can modify `va_list` in `evaluator.py` to use subset of validation data
 5. **Model compatibility**: Different models may need different workflows - workflows are model-specific to some degree
+6. **Analysis pitfall - Ignoring failures**: Failure rate (score=0) is critical; don't only analyze successful rounds
+7. **Analysis pitfall - Fake complexity**: Verify operators are actually used, not just called

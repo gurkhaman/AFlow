@@ -2,35 +2,61 @@
 
 experiments:
   # Phase 1: Cross-model validation (run in parallel)
-  - id: "qwen_trial1"
+  - id: "qwen_trial3"
     dataset: "GSM8K"
     exec_model: "Qwen/Qwen2.5-3B-Instruct"
-    description: "Llama trial 1 - test Qwen 3B model"
+    description: "Qwen trial 3 - test Qwen 3B model"
     tags: ["phase1", "qwen", "slm"]
 
-  - id: "llama_trial1"
+  - id: "llama_trial3"
     dataset: "GSM8K"
     exec_model: "meta-llama/Llama-3.2-3B-Instruct"
-    description: "Llama trial 1 - test Meta's 3B model"
+    description: "Llama trial 3 - test Meta's 3B model"
     tags: ["phase1", "llama", "slm"]
 
-  - id: "phi3_trial1"
+  - id: "phi3_trial3"
     dataset: "GSM8K"
     exec_model: "microsoft/Phi-3-mini-4k-instruct"
-    description: "Phi-3 trial 1 - test Microsoft's reasoning model"
+    description: "Phi-3 trial 3 - test Microsoft's reasoning model"
     tags: ["phase1", "phi3", "slm"]
 
-  # Phase 2: Add more experiments here based on Phase 1 results
-  # Examples (uncomment when ready):
-  # - id: "llama_trial2"
-  #   dataset: "GSM8K"
-  #   exec_model: "meta-llama/Llama-3.2-3B-Instruct"
-  #   tags: ["phase2", "llama"]
-  #
-  # - id: "qwen_trial3"
-  #   dataset: "GSM8K"
-  #   exec_model: "Qwen/Qwen2.5-3B-Instruct"
-  #   tags: ["phase2", "qwen"]
+  # Phase 2: MATH dataset - generalization testing
+  - id: "qwen_math_trial4"
+    dataset: "MATH"
+    exec_model: "Qwen/Qwen2.5-3B-Instruct"
+    description: "Qwen MATH trial 4 - test generalization to harder math problems"
+    tags: ["phase2", "qwen", "slm", "math"]
+
+  - id: "llama_math_trial3"
+    dataset: "MATH"
+    exec_model: "meta-llama/Llama-3.2-3B-Instruct"
+    description: "Llama MATH trial 3 - test generalization to harder math problems"
+    tags: ["phase2", "llama", "slm", "math"]
+
+  - id: "phi3_math_trial3"
+    dataset: "MATH"
+    exec_model: "microsoft/Phi-3-mini-4k-instruct"
+    description: "Phi-3 MATH trial 3 - test generalization to harder math problems"
+    tags: ["phase2", "phi3", "slm", "math"]
+
+  # Phase 3: HumanEval - code generation testing
+  - id: "qwen_humaneval_trial1"
+    dataset: "HumanEval"
+    exec_model: "Qwen/Qwen2.5-3B-Instruct"
+    description: "Qwen HumanEval trial 1 - test code generation capabilities"
+    tags: ["phase3", "qwen", "slm", "code"]
+
+  - id: "llama_humaneval_trial1"
+    dataset: "HumanEval"
+    exec_model: "meta-llama/Llama-3.2-3B-Instruct"
+    description: "Llama HumanEval trial 1 - test code generation capabilities"
+    tags: ["phase3", "llama", "slm", "code"]
+
+  - id: "phi3_humaneval_trial3"
+    dataset: "HumanEval"
+    exec_model: "microsoft/Phi-3-mini-4k-instruct"
+    description: "Phi-3 HumanEval trial 3 - test code generation capabilities"
+    tags: ["phase3", "phi3", "slm", "code"]
 
 # Default parameters for all experiments
 defaults:
